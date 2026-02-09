@@ -5,7 +5,7 @@ from app.firebase import firebase_auth, db
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-@router.post("/register-owner")
+@router.post("/register")
 def register_owner_endpoint(data: RegisterRequest):
     try:
         uid, business_id = register_owner(
@@ -27,6 +27,7 @@ def me(Authorization: str = Header(...)):
     user_doc = db.collection("users").document(decoded["uid"]).get()
     if not user_doc.exists:
         raise HTTPException(status_code=403, detail="User not found")
+
 
     user = user_doc.to_dict()
     return {
