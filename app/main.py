@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.employee.router import router as employee_router
-from app.modules.manager.router import router as manager_router
+from app.modules.manager.router_task import router as manager_router
 from app.modules.invites.router import router as invites_router
-
+from app.modules.manager.router_projects import projects_router, employees_router as router_projects, tasks_router
 
 app = FastAPI()
 
@@ -19,3 +19,6 @@ app.include_router(auth_router)
 app.include_router(invites_router)
 app.include_router(employee_router)
 app.include_router(manager_router)
+app.include_router(router_projects)
+app.include_router(projects_router)
+app.include_router(tasks_router)

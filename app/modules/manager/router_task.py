@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Header
-from app.modules.manager.service import get_my_tasks, update_task_status
+from app.modules.manager.service_task import get_my_tasks, update_task_status
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
