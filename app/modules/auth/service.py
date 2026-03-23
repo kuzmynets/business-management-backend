@@ -8,7 +8,7 @@ def register_owner(email: str, password: str, business_name: str):
     business_ref.set({
         "name": business_name,
         "owner_id": user.uid,
-        "plan": "free",
+        "subscription": "BASIC",
         "status": "active",
         "created_at": datetime.utcnow()
     })
