@@ -46,25 +46,7 @@ def project_details(project_id: str, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Project not found")
     return project
 
-@projects_router.get("/{project_id}/tasks")
-def project_tasks(project_id: str, current_user: dict = Depends(get_current_user)):
-    return get_tasks_by_project(project_id)
-
 # --- EMPLOYEES ---
 @employees_router.get("")
 def employees(current_user: dict = Depends(get_current_user)):
     return [emp for emp in list_employees() if emp.get("role") == "EMPLOYEE"]
-
-# --- TASKS ---
-@tasks_router.post("")
-def create_task(data: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    try:
-        task = create_task_service(
-            title=data["title"],
-            description=data.get("description", ""),
-            project_id=data["project_id"],
-            assigned_to=data["assigned_to"]
-        )
-        return task
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))

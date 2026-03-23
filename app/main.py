@@ -4,7 +4,10 @@ from app.modules.auth.router import router as auth_router
 from app.modules.employee.router import router as employee_router
 from app.modules.manager.router_task import router as manager_router
 from app.modules.invites.router import router as invites_router
-from app.modules.manager.router_projects import projects_router, employees_router as router_projects, tasks_router
+from app.modules.manager.router_projects import projects_router, employees_router as router_projects, tasks_router as task
+from app.modules.manager.router_orders import router as orders_router
+from app.modules.manager.router_tasks import router as tasks_router
+from app.modules.manager.router_dashboard import router as dashboard_router
 
 app = FastAPI()
 
@@ -21,4 +24,7 @@ app.include_router(employee_router)
 app.include_router(manager_router)
 app.include_router(router_projects)
 app.include_router(projects_router)
+app.include_router(task)
+app.include_router(orders_router)
 app.include_router(tasks_router)
+app.include_router(dashboard_router)
