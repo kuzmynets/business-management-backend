@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.core.security import get_current_user
-from app.modules.manager.service_dashboard import (
+from app.modules.manager.dashboard.service_dashboard import (
     get_active_orders,
     get_overdue_orders,
     get_team_tasks,

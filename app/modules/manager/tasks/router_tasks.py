@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from app.core.security import get_current_user
-from app.modules.manager.service_tasks import (
+from app.modules.manager.tasks.service_tasks import (
     get_tasks,
     create_task,
     update_task,

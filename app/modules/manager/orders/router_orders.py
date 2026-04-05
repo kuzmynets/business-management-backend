@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from app.core.security import get_current_user
-from app.modules.manager.orders_service import (
+from app.modules.manager.orders.orders_service import (
     get_orders,
     create_order,
     update_order,

@@ -1,17 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from app.core.security import get_current_user
-from app.modules.manager.service_projects import (
+from app.modules.manager.projects.service_projects import (
     get_my_projects,
     create_project,
-    get_tasks_by_project,
     get_project_by_id,
-    get_all_projects,
-    create_task_service
+    get_all_projects
 )
-from app.modules.manager.employees_service import list_employees
-from app.firebase import db
-from datetime import datetime, timezone
-import uuid
+from app.modules.manager.clients.employees_service import list_employees
 
 projects_router = APIRouter(prefix="/projects", tags=["projects"])
 employees_router = APIRouter(prefix="/employees", tags=["employees"])
