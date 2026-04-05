@@ -1,93 +1,88 @@
+from datetime import datetime
 from app.firebase import db
-from datetime import datetime, timezone
-
-ALLOWED_STATUSES = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
 
 
-def serialize_order(doc):
-    data = doc.to_dict()
-    data["id"] = doc.id
+def get_orders(business_id: str):
 
-    if data.get("deadline"):
-        deadline = data["deadline"]
-        if hasattr(deadline, "tzinfo") and deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-        data["deadline"] = deadline.isoformat()[:10]
+    orders_ref = (
+        db.collection("orders")
+        .where("business_id", "==", business_id)
+        .stream()
+    )
 
-    return data
+    orders = []
+
+    for doc in orders_ref:
+
+        order = doc.to_dict()
+
+        tasks_ref = (
+            db.collection("tasks")
+            .where("order_id", "==", doc.id)
+            .stream()
+        )
+
+        tasks = []
+
+        for t in tasks_ref:
+            task = t.to_dict()
+            tasks.append({
+                "id": t.id,
+                "title": task.get("title"),
+                "status": task.get("status")
+            })
+
+        orders.append({
+            "id": doc.id,
+            "title": order.get("title"),
+            "client": order.get("client"),
+            "deadline": order.get("deadline"),
+            "status": order.get("status", "NEW"),
+            "tasks": tasks
+        })
+
+    return orders
 
 
-def get_orders(business_id: str, status: str | None = None):
-    query = db.collection("orders").where("business_id", "==", business_id)
+def create_order(business_id: str, title: str, client: str, deadline: str | None):
 
-    if status:
-        query = query.where("status", "==", status)
-
-    return [serialize_order(doc) for doc in query.stream()]
-
-
-def create_order(data: dict, business_id: str):
-    if not data.get("title"):
-        raise ValueError("Title required")
-
-    order_ref = db.collection("orders").document()
-
-    order_ref.set({
-        "title": data["title"],
-        "description": data.get("description", ""),
-        "client_name": data.get("client_name", ""),
-        "status": data.get("status", "NEW"),
-        "deadline": datetime.fromisoformat(data["deadline"]) if data.get("deadline") else None,
+    order_data = {
+        "title": title,
+        "client": client,
+        "deadline": deadline,
+        "status": "NEW",
         "business_id": business_id,
-        "created_at": datetime.now(timezone.utc)
-    })
-
-    return {"id": order_ref.id}
-
-
-def update_order(order_id: str, data: dict, business_id: str):
-    order_ref = db.collection("orders").document(order_id)
-    doc = order_ref.get()
-
-    if not doc.exists:
-        raise ValueError("Order not found")
-
-    if doc.to_dict()["business_id"] != business_id:
-        raise ValueError("Forbidden")
-
-    update_data = {
-        "title": data.get("title"),
-        "description": data.get("description"),
-        "client_name": data.get("client_name"),
-        "status": data.get("status")
+        "created_at": datetime.utcnow()
     }
 
-    if data.get("deadline"):
-        update_data["deadline"] = datetime.fromisoformat(data["deadline"])
-    else:
-        update_data["deadline"] = None
+    ref = db.collection("orders").add(order_data)
 
-    order_ref.update(update_data)
+    return {
+        "id": ref[1].id,
+        **order_data,
+        "tasks": []
+    }
 
-    return {"success": True}
 
+def update_order_status(order_id: str, status: str):
 
-def update_order_status(order_id: str, status: str, business_id: str):
-    if status not in ALLOWED_STATUSES:
-        raise ValueError("Invalid status")
-
-    order_ref = db.collection("orders").document(order_id)
-    doc = order_ref.get()
+    doc_ref = db.collection("orders").document(order_id)
+    doc = doc_ref.get()
 
     if not doc.exists:
-        raise ValueError("Order not found")
+        return None
 
-    if doc.to_dict()["business_id"] != business_id:
-        raise ValueError("Forbidden")
-
-    order_ref.update({
+    doc_ref.update({
         "status": status,
-        "updated_at": datetime.now(timezone.utc)
+        "updated_at": datetime.utcnow()
     })
 
-    return {"success": True}
+    order = doc.to_dict()
+
+    return {
+        "id": order_id,
+        "title": order.get("title"),
+        "client": order.get("client"),
+        "deadline": order.get("deadline"),
+        "status": status
+    }

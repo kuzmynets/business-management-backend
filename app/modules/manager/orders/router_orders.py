@@ -1,57 +1,43 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from app.core.security import get_current_user
+from fastapi import APIRouter, HTTPException, Depends
 from app.modules.manager.orders.orders_service import (
     get_orders,
     create_order,
-    update_order,
     update_order_status
 )
+from app.core.security import get_current_user
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
+class CreateOrderRequest(BaseModel):
+    title: str
+    client: str
+    deadline: str | None = None
+
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+
+
 @router.get("")
-def list_orders(
-    status: str | None = Query(None),
-    current_user: dict = Depends(get_current_user)
-):
-    return get_orders(current_user["business_id"], status)
+def list_orders(current_user: dict = Depends(get_current_user)):
+    return get_orders(current_user["business_id"])
 
 
 @router.post("")
-def new_order(
-    data: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        return create_order(data, current_user["business_id"])
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.put("/{order_id}")
-def edit_order(
-    order_id: str,
-    data: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        return update_order(order_id, data, current_user["business_id"])
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def create_order_endpoint(data: CreateOrderRequest, current_user: dict = Depends(get_current_user)):
+    return create_order(
+        business_id=current_user["business_id"],
+        title=data.title,
+        client=data.client,
+        deadline=data.deadline
+    )
 
 
 @router.patch("/{order_id}/status")
-def change_status(
-    order_id: str,
-    data: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        return update_order_status(
-            order_id,
-            data["status"],
-            current_user["business_id"]
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def update_status(order_id: str, data: UpdateStatusRequest):
+    order = update_order_status(order_id, data.status)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
