@@ -1,79 +1,124 @@
 from datetime import datetime
 from app.firebase import db
 
+STATUSES = ["NEW", "IN_PROGRESS", "DONE"]
+PRIORITIES = ["LOW", "MEDIUM", "HIGH"]
+
 
 def get_tasks(business_id: str):
 
-    tasks_ref = (
+    docs = (
         db.collection("tasks")
         .where("business_id", "==", business_id)
         .stream()
     )
 
-    tasks = []
+    result = []
 
-    for doc in tasks_ref:
+    for t in docs:
+        task = t.to_dict()
 
-        task = doc.to_dict()
-        order_id = task.get("order_id")
-
-        order_title = None
-        if order_id:
-            order_doc = db.collection("orders").document(order_id).get()
-            if order_doc.exists:
-                order_title = order_doc.to_dict().get("title")
-
-        tasks.append({
-            "id": doc.id,
+        result.append({
+            "id": t.id,
             "title": task.get("title"),
+            "description": task.get("description", ""),
             "status": task.get("status", "NEW"),
+            "priority": task.get("priority", "MEDIUM"),
             "assigned_to": task.get("assigned_to"),
-            "deadline": task.get("deadline"),
-            "order_title": order_title
+            "order_id": task.get("order_id"),
+            "order_title": task.get("order_title"),
+            "deadline": task.get("deadline")
         })
 
-    return tasks
+    return result
 
 
-def update_task_status(task_id: str, status: str):
+def get_task_by_id(task_id: str):
 
-    doc_ref = db.collection("tasks").document(task_id)
-    doc = doc_ref.get()
+    ref = db.collection("tasks").document(task_id)
+    doc = ref.get()
 
     if not doc.exists:
         return None
 
-    doc_ref.update({
-        "status": status,
-        "updated_at": datetime.utcnow()
-    })
-
-    task = doc.to_dict()
+    t = doc.to_dict()
 
     return {
-        "id": task_id,
-        "status": status,
-        "assigned_to": task.get("assigned_to")
+        "id": doc.id,
+        "title": t.get("title"),
+        "description": t.get("description", ""),
+        "status": t.get("status", "NEW"),
+        "priority": t.get("priority", "MEDIUM"),
+        "assigned_to": t.get("assigned_to"),
+        "order_id": t.get("order_id"),
+        "order_title": t.get("order_title"),
+        "deadline": t.get("deadline")
     }
 
 
-def assign_task(task_id: str, assigned_to: str | None):
+def create_task(business_id: str, data):
 
-    doc_ref = db.collection("tasks").document(task_id)
-    doc = doc_ref.get()
+    order_title = None
+    deadline = None
+
+    if data.order_id:
+        order_doc = db.collection("orders").document(data.order_id).get()
+
+        if not order_doc.exists:
+            return None
+
+        order = order_doc.to_dict()
+        order_title = order.get("title")
+        deadline = order.get("deadline")
+
+    task_data = {
+        "title": data.title,
+        "description": data.description or "",
+        "order_id": data.order_id,
+        "order_title": order_title,
+        "assigned_to": data.assigned_to,
+        "status": "NEW",
+        "priority": data.priority or "MEDIUM",
+        "deadline": deadline,
+        "business_id": business_id,
+        "created_at": datetime.utcnow()
+    }
+
+    ref = db.collection("tasks").add(task_data)
+
+    return {
+        "id": ref[1].id,
+        **task_data
+    }
+
+
+def update_task(task_id: str, data: dict):
+
+    ref = db.collection("tasks").document(task_id)
+    doc = ref.get()
 
     if not doc.exists:
         return None
 
-    doc_ref.update({
-        "assigned_to": assigned_to,
-        "updated_at": datetime.utcnow()
-    })
+    update_data = {}
 
-    task = doc.to_dict()
+    allowed_fields = [
+        "title",
+        "description",
+        "status",
+        "priority",
+        "assigned_to"
+    ]
+
+    for field in allowed_fields:
+        if field in data:
+            update_data[field] = data[field]
+
+    update_data["updated_at"] = datetime.utcnow()
+
+    ref.update(update_data)
 
     return {
         "id": task_id,
-        "assigned_to": assigned_to,
-        "status": task.get("status")
+        **update_data
     }
