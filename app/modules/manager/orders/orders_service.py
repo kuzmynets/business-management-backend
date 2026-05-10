@@ -2,87 +2,176 @@ from datetime import datetime
 from app.firebase import db
 
 
+STATUSES = ["NEW", "IN_PROGRESS", "REVIEW", "COMPLETED"]
+
+
 def get_orders(business_id: str):
 
-    orders_ref = (
+    docs = (
         db.collection("orders")
         .where("business_id", "==", business_id)
         .stream()
     )
 
-    orders = []
+    result = []
 
-    for doc in orders_ref:
+    for doc in docs:
+        o = doc.to_dict()
 
-        order = doc.to_dict()
-
-        tasks_ref = (
-            db.collection("tasks")
-            .where("order_id", "==", doc.id)
-            .stream()
-        )
-
-        tasks = []
-
-        for t in tasks_ref:
-            task = t.to_dict()
-            tasks.append({
-                "id": t.id,
-                "title": task.get("title"),
-                "status": task.get("status")
-            })
-
-        orders.append({
+        result.append({
             "id": doc.id,
-            "title": order.get("title"),
-            "client": order.get("client"),
-            "deadline": order.get("deadline"),
-            "status": order.get("status", "NEW"),
-            "tasks": tasks
+            "title": o.get("title"),
+            "client_name": o.get("client_name"),
+            "status": o.get("status", "NEW")
         })
 
-    return orders
+    return result
 
 
-def create_order(business_id: str, title: str, client: str, deadline: str | None):
+def create_order(business_id: str, data):
+
+    client_name = data.client_name
+
+    if data.client_id:
+        client_doc = db.collection("clients").document(data.client_id).get()
+        if client_doc.exists:
+            client_name = client_doc.to_dict().get("name")
+
+    elif data.client_name:
+        db.collection("clients").add({
+            "name": data.client_name,
+            "business_id": business_id,
+            "created_at": datetime.utcnow()
+        })
+        client_name = data.client_name
 
     order_data = {
-        "title": title,
-        "client": client,
-        "deadline": deadline,
+        "title": data.title,
+        "client_name": client_name,
+        "client_id": data.client_id,
+        "budget": data.budget,
+        "deadline": data.deadline,
+        "description": data.description,
         "status": "NEW",
         "business_id": business_id,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
     }
 
-    ref = db.collection("orders").add(order_data)
+    doc_ref = db.collection("orders").document()
+    doc_ref.set(order_data)
 
     return {
-        "id": ref[1].id,
-        **order_data,
-        "tasks": []
+        "id": doc_ref.id,
+        **order_data
+    }
+
+
+def get_order_by_id(order_id: str):
+
+    ref = db.collection("orders").document(order_id)
+    doc = ref.get()
+
+    if not doc.exists:
+        return None
+
+    order = doc.to_dict()
+
+    tasks_docs = (
+        db.collection("tasks")
+        .where("order_id", "==", order_id)
+        .stream()
+    )
+
+    history_docs = (
+        db.collection("order_history")
+        .where("order_id", "==", order_id)
+        .stream()
+    )
+
+    tasks = [
+        {
+            "id": t.id,
+            **t.to_dict()
+        }
+        for t in tasks_docs
+    ]
+
+    history = [
+        {
+            "id": h.id,
+            **h.to_dict()
+        }
+        for h in history_docs
+    ]
+
+    return {
+        "id": order_id,
+        **order,
+        "tasks": tasks,
+        "history": history
+    }
+
+
+def update_order_fields(order_id: str, data: dict):
+
+    ref = db.collection("orders").document(order_id)
+    doc = ref.get()
+
+    if not doc.exists:
+        return None
+
+    allowed_fields = ["title", "description", "budget", "deadline", "status"]
+
+    update_data = {}
+
+    for key in allowed_fields:
+        if key in data:
+            update_data[key] = data[key]
+
+    if not update_data:
+        return {"id": order_id}
+
+    update_data["updated_at"] = datetime.utcnow()
+
+    ref.update(update_data)
+
+    if "status" in update_data:
+        db.collection("order_history").add({
+            "order_id": order_id,
+            "action": f"status -> {update_data['status']}",
+            "created_at": datetime.utcnow()
+        })
+
+    return {
+        "id": order_id,
+        **update_data
     }
 
 
 def update_order_status(order_id: str, status: str):
 
-    doc_ref = db.collection("orders").document(order_id)
-    doc = doc_ref.get()
+    if status not in STATUSES:
+        return None
+
+    ref = db.collection("orders").document(order_id)
+    doc = ref.get()
 
     if not doc.exists:
         return None
 
-    doc_ref.update({
+    ref.update({
         "status": status,
         "updated_at": datetime.utcnow()
     })
 
-    order = doc.to_dict()
+    db.collection("order_history").add({
+        "order_id": order_id,
+        "action": f"Status changed to {status}",
+        "created_at": datetime.utcnow()
+    })
 
     return {
         "id": order_id,
-        "title": order.get("title"),
-        "client": order.get("client"),
-        "deadline": order.get("deadline"),
         "status": status
     }

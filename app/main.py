@@ -12,6 +12,9 @@ from app.modules.owner.MyBusiness.router_business import router as business_rout
 from app.modules.owner.Finance.router_finance import router as finance_router
 from app.modules.owner.Analytic.router_analytics import router as analytic_router
 from app.modules.owner.Subscription.router_subscription import router as subscription_router
+from app.modules.owner.Dashboard.router_dashboard import router as dashboard_router_owner
+from app.modules.manager.clients.clients_router import router as clients_router
+
 app = FastAPI()
 
 app.add_middleware(
@@ -28,6 +31,7 @@ app.include_router(manager_router)
 app.include_router(router_projects)
 app.include_router(projects_router)
 app.include_router(task)
+app.include_router(clients_router)
 app.include_router(orders_router)
 app.include_router(tasks_router)
 app.include_router(dashboard_router)
@@ -35,3 +39,4 @@ app.include_router(business_router)
 app.include_router(finance_router)
 app.include_router(analytic_router)
 app.include_router(subscription_router)
+app.include_router(dashboard_router_owner)
