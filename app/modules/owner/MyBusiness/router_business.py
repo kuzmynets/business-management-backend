@@ -1,40 +1,72 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from app.core.security import get_current_user
-from app.modules.owner.MyBusiness.service_business import get_business_by_id, update_business, deactivate_business
+from app.modules.owner.MyBusiness.business_service import (
+    get_business,
+    update_business,
+    deactivate_business,
+    delete_business
+)
 
-router = APIRouter(prefix="/business", tags=["business"])
+router = APIRouter(
+    prefix="/business",
+    tags=["business"]
+)
 
-@router.get("/{business_id}")
-def read_business(business_id: str, current_user: dict = Depends(get_current_user)):
-    business = get_business_by_id(business_id)
+
+class UpdateBusinessRequest(BaseModel):
+    name: str | None = None
+    logo_url: str | None = None
+    currency: str | None = None
+    timezone: str | None = None
+
+
+@router.get("")
+def get_business_endpoint(user=Depends(get_current_user)):
+
+    business = get_business(user["business_id"])
+
     if not business:
-        raise HTTPException(status_code=404, detail="Business not found")
+        raise HTTPException(404, "Business not found")
+
     return business
 
-@router.patch("/{business_id}")
-def patch_business(
-    business_id: str,
-    data: dict = Body(...),
-    current_user: dict = Depends(get_current_user)
+
+@router.patch("")
+def update_business_endpoint(
+    data: UpdateBusinessRequest,
+    user=Depends(get_current_user)
 ):
-    name = data.get("name")
-    subscription = data.get("subscription")
 
-    if name is None and subscription is None:
-        raise HTTPException(status_code=400, detail="No fields to update")
+    business = update_business(
+        user["business_id"],
+        data.dict(exclude_none=True)
+    )
 
-    try:
-        return update_business(
-            business_id=business_id,
-            name=name,
-            subscription=subscription
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    if not business:
+        raise HTTPException(404, "Business not found")
 
-@router.post("/{business_id}/deactivate")
-def post_deactivate_business(business_id: str, current_user: dict = Depends(get_current_user)):
-    try:
-        return deactivate_business(business_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    return business
+
+
+@router.post("/deactivate")
+def deactivate_business_endpoint(user=Depends(get_current_user)):
+
+    result = deactivate_business(user["business_id"])
+
+    if not result:
+        raise HTTPException(404, "Business not found")
+
+    return result
+
+
+@router.delete("")
+def delete_business_endpoint(user=Depends(get_current_user)):
+
+    result = delete_business(user["business_id"])
+
+    if not result:
+        raise HTTPException(404, "Business not found")
+
+    return result
