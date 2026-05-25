@@ -1,43 +1,122 @@
-from typing import List, Dict
 from datetime import datetime
-from google.cloud import firestore
+from app.firebase import db
 
-def parse_period(period: str) -> datetime:
-    now = datetime.utcnow()
-    if period == "day":
-        start = datetime(now.year, now.month, now.day)
-    elif period == "month":
-        start = datetime(now.year, now.month, 1)
-    elif period == "year":
-        start = datetime(now.year, 1, 1)
-    else:
-        start = datetime.min
-    return start
 
-async def get_finance_data(db: firestore.Client, business_id: str, period: str) -> List[Dict]:
-    start_date = parse_period(period)
+def serialize_date(value):
 
-    transactions_ref = db.collection("transactions")
-    query = transactions_ref.where("business_id", "==", business_id).where("date", ">=", start_date).order_by("date", direction=firestore.Query.DESCENDING)
-    docs = query.stream()
+    if not value:
+        return None
+
+    if isinstance(value, str):
+        return value
+
+    try:
+        return value.isoformat()
+    except:
+        return None
+
+
+def get_finance_transactions(business_id: str):
+
+    transactions_docs = (
+        db.collection("finance")
+        .where("business_id", "==", business_id)
+        .stream()
+    )
 
     result = []
-    async for doc in docs:
-        t = doc.to_dict()
-        # підтягуємо назву замовлення, якщо є
-        order_title = None
-        if t.get("order_id"):
-            order_doc = await db.collection("orders").document(t["order_id"]).get()
-            if order_doc.exists:
-                order_title = order_doc.to_dict().get("title")
+
+    for doc in transactions_docs:
+
+        transaction = doc.to_dict()
+
         result.append({
             "id": doc.id,
-            "date": t.get("date").isoformat() if t.get("date") else None,
-            "type": t.get("type"),
-            "income": t.get("amount") if t.get("type") == "income" else 0.0,
-            "expense": t.get("amount") if t.get("type") == "expense" else 0.0,
-            "order_id": t.get("order_id"),
-            "order_title": order_title,
-            "description": t.get("description")
+            "type": transaction.get("type", "EXPENSE"),
+            "amount": float(transaction.get("amount", 0)),
+            "category": transaction.get("category"),
+            "order_id": transaction.get("order_id"),
+            "order_title": transaction.get("order_title"),
+            "description": transaction.get("description"),
+            "date": serialize_date(
+                transaction.get("date")
+            )
         })
+
+    result.sort(
+        key=lambda x: x.get("date") or "",
+        reverse=True
+    )
+
     return result
+
+
+def create_finance_transaction(data: dict):
+
+    transaction_data = {
+        "type": data.get("type", "EXPENSE"),
+        "amount": float(data.get("amount", 0)),
+        "category": data.get("category"),
+        "order_id": data.get("order_id"),
+        "order_title": data.get("order_title"),
+        "description": data.get("description"),
+        "business_id": data.get("business_id"),
+        "date": data.get("date") or datetime.utcnow(),
+        "created_at": datetime.utcnow()
+    }
+
+    ref = db.collection("finance").add(transaction_data)
+
+    return {
+        "id": ref[1].id,
+        **transaction_data,
+        "date": serialize_date(transaction_data.get("date"))
+    }
+
+
+def create_order_income_transactions(business_id: str):
+
+    orders_docs = (
+        db.collection("orders")
+        .where("business_id", "==", business_id)
+        .stream()
+    )
+
+    created = 0
+
+    for doc in orders_docs:
+
+        order = doc.to_dict()
+
+        existing = (
+            db.collection("finance")
+            .where("order_id", "==", doc.id)
+            .where("type", "==", "INCOME")
+            .limit(1)
+            .stream()
+        )
+
+        if list(existing):
+            continue
+
+        price = order.get("price") or order.get("budget") or 0
+
+        if float(price) <= 0:
+            continue
+
+        create_finance_transaction({
+            "type": "INCOME",
+            "amount": price,
+            "category": "Order Payment",
+            "order_id": doc.id,
+            "order_title": order.get("title"),
+            "description": f"Income from order {order.get('title')}",
+            "business_id": business_id,
+            "date": order.get("created_at")
+        })
+
+        created += 1
+
+    return {
+        "created": created
+    }
