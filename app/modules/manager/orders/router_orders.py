@@ -47,7 +47,7 @@ def create_order_endpoint(
     data: CreateOrderRequest,
     user=Depends(get_current_user)
 ):
-    return create_order(user["business_id"], data)
+    return create_order(user["business_id"], data, user)
 
 
 @router.get("/{order_id}")

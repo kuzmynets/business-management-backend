@@ -170,7 +170,6 @@ def update_order_status(order_id: str, status: str, user):
         "updated_at": datetime.utcnow()
     }
 
-    # FIX: якщо завершили — фіксуємо хто завершив
     if status == "COMPLETED":
         update_data["completed_by"] = user["uid"]
 
@@ -179,6 +178,7 @@ def update_order_status(order_id: str, status: str, user):
     db.collection("order_history").add({
         "order_id": order_id,
         "action": f"Status -> {status}",
+        "actor": user["uid"],
         "created_at": datetime.utcnow()
     })
 
