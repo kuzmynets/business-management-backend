@@ -1,19 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.modules.auth.router import router as auth_router
-from app.modules.employee.router import router as employee_router
-from app.modules.manager.tasks.router_tasks import router as manager_router
 from app.modules.invites.router import router as invites_router
+
+from app.modules.employee.router_employee_tasks import router as employee_tasks_router
+
+from app.modules.manager.tasks.router_tasks import router as tasks_router
 from app.modules.manager.orders.router_orders import router as orders_router
 from app.modules.manager.clients.clients_router import router as clients_router
-from app.modules.manager.tasks.router_tasks import router as tasks_router
-from app.modules.manager.employees.router_employees import router as tasks_employee_router
-from app.modules.manager.dashboard.router_dashboard import router as dashboard_router
+from app.modules.manager.employees.router_employees import router as employees_router
+from app.modules.manager.dashboard.router_dashboard import router as manager_dashboard_router
+
 from app.modules.owner.MyBusiness.router_business import router as business_router
 from app.modules.owner.Finance.finance_router import router as finance_router
 from app.modules.owner.Analytic.router_analytics import router as analytic_router
 from app.modules.owner.Subscription.router_subscription import router as subscription_router
-from app.modules.owner.Dashboard.router_dashboard import router as dashboard_router_owner
+from app.modules.owner.Dashboard.router_dashboard import router as owner_dashboard_router
 
 app = FastAPI()
 
@@ -26,16 +29,17 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(invites_router)
-app.include_router(employee_router)
-app.include_router(manager_router)
-app.include_router(clients_router)
+
+app.include_router(employee_tasks_router)
+
 app.include_router(tasks_router)
-app.include_router(tasks_employee_router)
 app.include_router(orders_router)
-app.include_router(tasks_router)
-app.include_router(dashboard_router)
+app.include_router(clients_router)
+app.include_router(employees_router)
+app.include_router(manager_dashboard_router)
+
 app.include_router(business_router)
 app.include_router(finance_router)
 app.include_router(analytic_router)
 app.include_router(subscription_router)
-app.include_router(dashboard_router_owner)
+app.include_router(owner_dashboard_router)
