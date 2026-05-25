@@ -3,13 +3,10 @@ from app.firebase import db
 
 
 def serialize_date(value):
-
     if not value:
         return None
-
     if isinstance(value, str):
         return value
-
     try:
         return value.isoformat()
     except:
@@ -18,7 +15,7 @@ def serialize_date(value):
 
 def get_finance_transactions(business_id: str):
 
-    transactions_docs = (
+    docs = (
         db.collection("finance")
         .where("business_id", "==", business_id)
         .stream()
@@ -26,57 +23,51 @@ def get_finance_transactions(business_id: str):
 
     result = []
 
-    for doc in transactions_docs:
-
-        transaction = doc.to_dict()
+    for doc in docs:
+        t = doc.to_dict()
 
         result.append({
             "id": doc.id,
-            "type": transaction.get("type", "EXPENSE"),
-            "amount": float(transaction.get("amount", 0)),
-            "category": transaction.get("category"),
-            "order_id": transaction.get("order_id"),
-            "order_title": transaction.get("order_title"),
-            "description": transaction.get("description"),
-            "date": serialize_date(
-                transaction.get("date")
-            )
+            "type": t.get("type", "EXPENSE"),
+            "amount": float(t.get("amount", 0)),
+            "category": t.get("category"),
+            "order_id": t.get("order_id"),
+            "order_title": t.get("order_title"),
+            "description": t.get("description"),
+            "date": serialize_date(t.get("date")),
         })
 
-    result.sort(
-        key=lambda x: x.get("date") or "",
-        reverse=True
-    )
+    result.sort(key=lambda x: x["date"] or "", reverse=True)
 
     return result
 
 
-def create_finance_transaction(data: dict):
+def create_finance_transaction(business_id: str, data: dict):
 
-    transaction_data = {
-        "type": data.get("type", "EXPENSE"),
+    tx = {
+        "type": data["type"],   # INCOME / EXPENSE
         "amount": float(data.get("amount", 0)),
-        "category": data.get("category"),
+        "category": data.get("category", ""),
         "order_id": data.get("order_id"),
         "order_title": data.get("order_title"),
         "description": data.get("description"),
-        "business_id": data.get("business_id"),
+        "business_id": business_id,
         "date": data.get("date") or datetime.utcnow(),
         "created_at": datetime.utcnow()
     }
 
-    ref = db.collection("finance").add(transaction_data)
+    ref = db.collection("finance").add(tx)
 
     return {
         "id": ref[1].id,
-        **transaction_data,
-        "date": serialize_date(transaction_data.get("date"))
+        **tx,
+        "date": serialize_date(tx["date"])
     }
 
 
 def create_order_income_transactions(business_id: str):
 
-    orders_docs = (
+    orders = (
         db.collection("orders")
         .where("business_id", "==", business_id)
         .stream()
@@ -84,39 +75,46 @@ def create_order_income_transactions(business_id: str):
 
     created = 0
 
-    for doc in orders_docs:
+    for o in orders:
+        order = o.to_dict()
 
-        order = doc.to_dict()
-
-        existing = (
+        exists = (
             db.collection("finance")
-            .where("order_id", "==", doc.id)
+            .where("order_id", "==", o.id)
             .where("type", "==", "INCOME")
             .limit(1)
             .stream()
         )
 
-        if list(existing):
+        if list(exists):
             continue
 
-        price = order.get("price") or order.get("budget") or 0
+        price = float(order.get("price") or order.get("budget") or 0)
 
-        if float(price) <= 0:
+        if price <= 0:
             continue
 
-        create_finance_transaction({
+        create_finance_transaction(business_id, {
             "type": "INCOME",
             "amount": price,
             "category": "Order Payment",
-            "order_id": doc.id,
+            "order_id": o.id,
             "order_title": order.get("title"),
             "description": f"Income from order {order.get('title')}",
-            "business_id": business_id,
-            "date": order.get("created_at")
+            "date": order.get("created_at"),
         })
 
         created += 1
 
-    return {
-        "created": created
-    }
+    return {"created": created}
+
+
+def create_expense_transaction(business_id: str, data: dict):
+
+    return create_finance_transaction(business_id, {
+        "type": "EXPENSE",
+        "amount": data.get("amount"),
+        "category": data.get("category"),
+        "description": data.get("description"),
+        "date": data.get("date"),
+    })

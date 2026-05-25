@@ -28,7 +28,7 @@ def get_orders(business_id: str):
     return result
 
 
-def create_order(business_id: str, data):
+def create_order(business_id: str, data, user):
 
     client_name = data.client_name
 
@@ -43,7 +43,6 @@ def create_order(business_id: str, data):
             "business_id": business_id,
             "created_at": datetime.utcnow()
         })
-        client_name = data.client_name
 
     order_data = {
         "title": data.title,
@@ -52,8 +51,14 @@ def create_order(business_id: str, data):
         "budget": data.budget,
         "deadline": data.deadline,
         "description": data.description,
+
         "status": "NEW",
+
         "business_id": business_id,
+
+        "created_by": user["uid"],   # FIX
+        "completed_by": None,        # FIX
+
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
     }
@@ -149,7 +154,7 @@ def update_order_fields(order_id: str, data: dict):
     }
 
 
-def update_order_status(order_id: str, status: str):
+def update_order_status(order_id: str, status: str, user):
 
     if status not in STATUSES:
         return None
@@ -160,18 +165,24 @@ def update_order_status(order_id: str, status: str):
     if not doc.exists:
         return None
 
-    ref.update({
+    update_data = {
         "status": status,
         "updated_at": datetime.utcnow()
-    })
+    }
+
+    # FIX: якщо завершили — фіксуємо хто завершив
+    if status == "COMPLETED":
+        update_data["completed_by"] = user["uid"]
+
+    ref.update(update_data)
 
     db.collection("order_history").add({
         "order_id": order_id,
-        "action": f"Status changed to {status}",
+        "action": f"Status -> {status}",
         "created_at": datetime.utcnow()
     })
 
     return {
         "id": order_id,
-        "status": status
+        **update_data
     }

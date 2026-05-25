@@ -15,8 +15,6 @@ def get_business(business_id: str):
         "id": doc.id,
         "name": business.get("name"),
         "logo_url": business.get("logo_url"),
-        "currency": business.get("currency", "USD"),
-        "timezone": business.get("timezone", "UTC"),
         "subscription": business.get("subscription", "FREE"),
         "is_active": business.get("is_active", True),
         "created_at": business.get("created_at")
@@ -37,8 +35,6 @@ def update_business(business_id: str, data: dict):
     for field in [
         "name",
         "logo_url",
-        "currency",
-        "timezone"
     ]:
         if field in data:
             update_data[field] = data[field]
@@ -53,8 +49,6 @@ def update_business(business_id: str, data: dict):
         "id": business_id,
         "name": updated.get("name"),
         "logo_url": updated.get("logo_url"),
-        "currency": updated.get("currency", "USD"),
-        "timezone": updated.get("timezone", "UTC"),
         "subscription": updated.get("subscription", "FREE"),
         "is_active": updated.get("is_active", True),
         "created_at": updated.get("created_at")

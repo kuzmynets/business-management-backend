@@ -67,8 +67,14 @@ def update_order(order_id: str, data: UpdateOrderRequest):
 
 
 @router.patch("/{order_id}/status")
-def change_status(order_id: str, data: UpdateStatusRequest):
-    result = update_order_status(order_id, data.status)
+def change_status(
+    order_id: str,
+    data: UpdateStatusRequest,
+    user=Depends(get_current_user)
+):
+    result = update_order_status(order_id, data.status, user)
+
     if not result:
         raise HTTPException(status_code=404, detail="Order not found")
+
     return result
