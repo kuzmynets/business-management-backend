@@ -17,8 +17,13 @@ conf = ConnectionConfig(
     TEMPLATE_FOLDER="."
 )
 
-async def send_invite_email(to: EmailStr, temp_password: str, token: str):
+async def send_invite_email(to: EmailStr, temp_password: str | None, token: str):
     invite_link = f"http://localhost:3000/accept-invite/{token}"
+    password_text = (
+        f"Temporary password: {temp_password}\n\n"
+        if temp_password
+        else "Use your existing account password to sign in after accepting.\n\n"
+    )
     message = MessageSchema(
         subject="You are invited to join the business",
         recipients=[to],
@@ -26,7 +31,7 @@ async def send_invite_email(to: EmailStr, temp_password: str, token: str):
             f"Hello!\n\n"
             f"You have been invited to join the business.\n"
             f"Your login: {to}\n"
-            f"Temporary password: {temp_password}\n\n"
+            f"{password_text}"
             f"Please accept invite here: {invite_link}"
         ),
         subtype="plain"

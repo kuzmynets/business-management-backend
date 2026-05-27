@@ -39,6 +39,8 @@ class UpdateStatusRequest(BaseModel):
 
 @router.get("")
 def list_orders(user=Depends(get_current_user)):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
     return get_orders(user["business_id"])
 
 
@@ -47,20 +49,26 @@ def create_order_endpoint(
     data: CreateOrderRequest,
     user=Depends(get_current_user)
 ):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
     return create_order(user["business_id"], data, user)
 
 
 @router.get("/{order_id}")
-def get_order(order_id: str):
-    order = get_order_by_id(order_id)
+def get_order(order_id: str, user=Depends(get_current_user)):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    order = get_order_by_id(order_id, user["business_id"])
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
 
 @router.patch("/{order_id}")
-def update_order(order_id: str, data: UpdateOrderRequest):
-    result = update_order_fields(order_id, data.dict(exclude_unset=True))
+def update_order(order_id: str, data: UpdateOrderRequest, user=Depends(get_current_user)):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    result = update_order_fields(order_id, user["business_id"], data.dict(exclude_unset=True), user)
     if not result:
         raise HTTPException(status_code=404, detail="Order not found")
     return result
@@ -72,7 +80,9 @@ def change_status(
     data: UpdateStatusRequest,
     user=Depends(get_current_user)
 ):
-    result = update_order_status(order_id, data.status, user)
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    result = update_order_status(order_id, user["business_id"], data.status, user)
 
     if not result:
         raise HTTPException(status_code=404, detail="Order not found")

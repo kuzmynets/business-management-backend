@@ -45,6 +45,9 @@ def get_manager_dashboard(business_id: str):
     active_orders = []
     overdue_orders = []
     problem_orders = []
+    completed_today = 0
+    in_progress = 0
+    today = datetime.now(timezone.utc).date()
 
     for o in orders:
         order = o.to_dict()
@@ -61,6 +64,13 @@ def get_manager_dashboard(business_id: str):
 
         if status in ["NEW", "IN_PROGRESS"]:
             active_orders.append(item)
+
+        if status == "IN_PROGRESS":
+            in_progress += 1
+
+        updated = normalize_dt(order.get("updated_at"))
+        if status == "COMPLETED" and updated and updated.date() == today:
+            completed_today += 1
 
         if overdue:
             overdue_orders.append(item)
@@ -84,14 +94,30 @@ def get_manager_dashboard(business_id: str):
 
         if task.get("status") == "IN_PROGRESS":
             team_tasks.append(item)
+            in_progress += 1
+
+        updated = normalize_dt(task.get("updated_at"))
+        if task.get("status") == "DONE" and updated and updated.date() == today:
+            completed_today += 1
 
         if is_overdue(task.get("deadline")):
             overdue_tasks.append(item)
+
+    employees_count = len(list(
+        db.collection("business_members")
+        .where("business_id", "==", business_id)
+        .where("role", "==", "EMPLOYEE")
+        .where("status", "==", "active")
+        .stream()
+    ))
 
     return {
         "active_orders": active_orders,
         "overdue_orders": overdue_orders,
         "team_tasks": team_tasks,
         "overdue_tasks": overdue_tasks,
-        "problem_orders": problem_orders
+        "problem_orders": problem_orders,
+        "completed_today": completed_today,
+        "in_progress": in_progress,
+        "employees_count": employees_count
     }

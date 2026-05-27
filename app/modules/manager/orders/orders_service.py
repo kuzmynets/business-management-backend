@@ -1,5 +1,6 @@
 from datetime import datetime
 from app.firebase import db
+from app.modules.owner.Finance.finance_service import create_order_income_transaction
 
 
 STATUSES = ["NEW", "IN_PROGRESS", "REVIEW", "COMPLETED"]
@@ -72,7 +73,7 @@ def create_order(business_id: str, data, user):
     }
 
 
-def get_order_by_id(order_id: str):
+def get_order_by_id(order_id: str, business_id: str):
 
     ref = db.collection("orders").document(order_id)
     doc = ref.get()
@@ -81,6 +82,8 @@ def get_order_by_id(order_id: str):
         return None
 
     order = doc.to_dict()
+    if order.get("business_id") != business_id:
+        return None
 
     tasks_docs = (
         db.collection("tasks")
@@ -118,12 +121,34 @@ def get_order_by_id(order_id: str):
     }
 
 
-def update_order_fields(order_id: str, data: dict):
+def _apply_completion_fields(order_id: str, business_id: str, order: dict, update_data: dict, user):
+    if update_data.get("status") == "COMPLETED":
+        update_data["completed_by"] = user["uid"]
+        update_data["completed_at"] = datetime.utcnow()
+        create_order_income_transaction(
+            business_id,
+            order_id,
+            {
+                **order,
+                **update_data,
+            }
+        )
+    elif "status" in update_data:
+        update_data["completed_by"] = None
+        update_data["completed_at"] = None
+
+
+def update_order_fields(order_id: str, business_id: str, data: dict, user):
 
     ref = db.collection("orders").document(order_id)
     doc = ref.get()
 
     if not doc.exists:
+        return None
+
+    order = doc.to_dict()
+
+    if order.get("business_id") != business_id:
         return None
 
     allowed_fields = ["title", "description", "budget", "deadline", "status"]
@@ -138,6 +163,7 @@ def update_order_fields(order_id: str, data: dict):
         return {"id": order_id}
 
     update_data["updated_at"] = datetime.utcnow()
+    _apply_completion_fields(order_id, business_id, order, update_data, user)
 
     ref.update(update_data)
 
@@ -154,7 +180,7 @@ def update_order_fields(order_id: str, data: dict):
     }
 
 
-def update_order_status(order_id: str, status: str, user):
+def update_order_status(order_id: str, business_id: str, status: str, user):
 
     if status not in STATUSES:
         return None
@@ -165,13 +191,17 @@ def update_order_status(order_id: str, status: str, user):
     if not doc.exists:
         return None
 
+    order = doc.to_dict()
+
+    if order.get("business_id") != business_id:
+        return None
+
     update_data = {
         "status": status,
         "updated_at": datetime.utcnow()
     }
 
-    if status == "COMPLETED":
-        update_data["completed_by"] = user["uid"]
+    _apply_completion_fields(order_id, business_id, order, update_data, user)
 
     ref.update(update_data)
 

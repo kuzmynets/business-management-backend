@@ -33,7 +33,7 @@ def get_tasks(business_id: str):
     return result
 
 
-def get_task_by_id(task_id: str):
+def get_task_by_id(task_id: str, business_id: str):
 
     ref = db.collection("tasks").document(task_id)
     doc = ref.get()
@@ -42,6 +42,8 @@ def get_task_by_id(task_id: str):
         return None
 
     t = doc.to_dict()
+    if t.get("business_id") != business_id:
+        return None
 
     return {
         "id": doc.id,
@@ -56,7 +58,7 @@ def get_task_by_id(task_id: str):
     }
 
 
-def create_task(business_id: str, data):
+def create_task(business_id: str, data, user=None):
 
     order_title = None
     deadline = None
@@ -81,6 +83,8 @@ def create_task(business_id: str, data):
         "priority": data.priority or "MEDIUM",
         "deadline": deadline,
         "business_id": business_id,
+        "created_by": user["uid"] if user else None,
+        "assigned_by": user["uid"] if user else None,
         "created_at": datetime.utcnow()
     }
 
@@ -92,12 +96,15 @@ def create_task(business_id: str, data):
     }
 
 
-def update_task(task_id: str, data: dict):
+def update_task(task_id: str, business_id: str, data: dict):
 
     ref = db.collection("tasks").document(task_id)
     doc = ref.get()
 
     if not doc.exists:
+        return None
+
+    if doc.to_dict().get("business_id") != business_id:
         return None
 
     update_data = {}

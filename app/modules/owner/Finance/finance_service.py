@@ -13,7 +13,7 @@ def serialize_date(value):
         return None
 
 
-def get_finance_transactions(business_id: str):
+def get_finance_transactions(business_id: str, page: int = 1, limit: int = 10):
 
     docs = (
         db.collection("finance")
@@ -22,14 +22,21 @@ def get_finance_transactions(business_id: str):
     )
 
     result = []
+    income_total = 0.0
+    expense_total = 0.0
 
     for doc in docs:
         t = doc.to_dict()
+        amount = float(t.get("amount", 0))
+        if t.get("type") == "INCOME":
+            income_total += amount
+        elif t.get("type") == "EXPENSE":
+            expense_total += amount
 
         result.append({
             "id": doc.id,
             "type": t.get("type", "EXPENSE"),
-            "amount": float(t.get("amount", 0)),
+            "amount": amount,
             "category": t.get("category"),
             "order_id": t.get("order_id"),
             "order_title": t.get("order_title"),
@@ -39,7 +46,25 @@ def get_finance_transactions(business_id: str):
 
     result.sort(key=lambda x: x["date"] or "", reverse=True)
 
-    return result
+    total = len(result)
+    page = max(page, 1)
+    limit = max(min(limit, 100), 1)
+    start = (page - 1) * limit
+    end = start + limit
+    total_pages = (total + limit - 1) // limit
+
+    return {
+        "items": result[start:end],
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "total_pages": total_pages,
+        "summary": {
+            "income": income_total,
+            "expenses": expense_total,
+            "profit": income_total - expense_total
+        }
+    }
 
 
 def create_finance_transaction(business_id: str, data: dict):
@@ -65,6 +90,33 @@ def create_finance_transaction(business_id: str, data: dict):
     }
 
 
+def create_order_income_transaction(business_id: str, order_id: str, order: dict):
+    exists = (
+        db.collection("finance")
+        .where("order_id", "==", order_id)
+        .where("type", "==", "INCOME")
+        .limit(1)
+        .stream()
+    )
+
+    if list(exists):
+        return None
+
+    price = float(order.get("price") or order.get("budget") or 0)
+    if price <= 0:
+        return None
+
+    return create_finance_transaction(business_id, {
+        "type": "INCOME",
+        "amount": price,
+        "category": "Order Payment",
+        "order_id": order_id,
+        "order_title": order.get("title"),
+        "description": f"Income from order {order.get('title')}",
+        "date": order.get("completed_at") or order.get("updated_at") or datetime.utcnow(),
+    })
+
+
 def create_order_income_transactions(business_id: str):
 
     orders = (
@@ -78,33 +130,11 @@ def create_order_income_transactions(business_id: str):
     for o in orders:
         order = o.to_dict()
 
-        exists = (
-            db.collection("finance")
-            .where("order_id", "==", o.id)
-            .where("type", "==", "INCOME")
-            .limit(1)
-            .stream()
-        )
-
-        if list(exists):
+        if order.get("status") != "COMPLETED":
             continue
 
-        price = float(order.get("price") or order.get("budget") or 0)
-
-        if price <= 0:
-            continue
-
-        create_finance_transaction(business_id, {
-            "type": "INCOME",
-            "amount": price,
-            "category": "Order Payment",
-            "order_id": o.id,
-            "order_title": order.get("title"),
-            "description": f"Income from order {order.get('title')}",
-            "date": order.get("created_at"),
-        })
-
-        created += 1
+        if create_order_income_transaction(business_id, o.id, order):
+            created += 1
 
     return {"created": created}
 

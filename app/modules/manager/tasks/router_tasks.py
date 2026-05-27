@@ -30,12 +30,16 @@ class UpdateTaskRequest(BaseModel):
 
 @router.get("")
 def list_tasks(user=Depends(get_current_user)):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(403, "Forbidden")
     return get_tasks(user["business_id"])
 
 
 @router.get("/{task_id}")
 def get_task(task_id: str, user=Depends(get_current_user)):
-    task = get_task_by_id(task_id)
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(403, "Forbidden")
+    task = get_task_by_id(task_id, user["business_id"])
 
     if not task:
         raise HTTPException(404, "Task not found")
@@ -45,7 +49,9 @@ def get_task(task_id: str, user=Depends(get_current_user)):
 
 @router.post("")
 def create_task_endpoint(data: CreateTaskRequest, user=Depends(get_current_user)):
-    task = create_task(user["business_id"], data)
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(403, "Forbidden")
+    task = create_task(user["business_id"], data, user)
 
     if not task:
         raise HTTPException(404, "Order not found")
@@ -54,8 +60,10 @@ def create_task_endpoint(data: CreateTaskRequest, user=Depends(get_current_user)
 
 
 @router.patch("/{task_id}")
-def update_task_endpoint(task_id: str, data: UpdateTaskRequest):
-    result = update_task(task_id, data.dict(exclude_none=True))
+def update_task_endpoint(task_id: str, data: UpdateTaskRequest, user=Depends(get_current_user)):
+    if user["role"] not in ["OWNER", "MANAGER"]:
+        raise HTTPException(403, "Forbidden")
+    result = update_task(task_id, user["business_id"], data.dict(exclude_none=True))
 
     if not result:
         raise HTTPException(404, "Task not found")

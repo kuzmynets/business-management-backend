@@ -10,12 +10,22 @@ def register_owner(email: str, password: str, business_name: str):
         "owner_id": user.uid,
         "subscription": "BASIC",
         "status": "active",
+        "is_active": True,
+        "created_at": datetime.utcnow()
+    })
+
+    db.collection("business_members").add({
+        "business_id": business_ref.id,
+        "user_id": user.uid,
+        "email": email,
+        "role": "OWNER",
+        "status": "active",
+        "joined_at": datetime.utcnow(),
         "created_at": datetime.utcnow()
     })
 
     db.collection("users").document(user.uid).set({
         "email": email,
-        "role": "OWNER",
         "business_id": business_ref.id,
         "status": "active",
         "created_at": datetime.utcnow()
