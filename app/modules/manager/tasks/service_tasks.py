@@ -2,8 +2,6 @@ from datetime import datetime
 from app.firebase import db
 
 STATUSES = ["NEW", "IN_PROGRESS", "DONE"]
-PRIORITIES = ["LOW", "MEDIUM", "HIGH"]
-
 
 def get_tasks(business_id: str):
 
@@ -23,7 +21,6 @@ def get_tasks(business_id: str):
             "title": task.get("title"),
             "description": task.get("description", ""),
             "status": task.get("status", "NEW"),
-            "priority": task.get("priority", "MEDIUM"),
             "assigned_to": task.get("assigned_to"),
             "order_id": task.get("order_id"),
             "order_title": task.get("order_title"),
@@ -50,7 +47,6 @@ def get_task_by_id(task_id: str, business_id: str):
         "title": t.get("title"),
         "description": t.get("description", ""),
         "status": t.get("status", "NEW"),
-        "priority": t.get("priority", "MEDIUM"),
         "assigned_to": t.get("assigned_to"),
         "order_id": t.get("order_id"),
         "order_title": t.get("order_title"),
@@ -80,7 +76,6 @@ def create_task(business_id: str, data, user=None):
         "order_title": order_title,
         "assigned_to": data.assigned_to,
         "status": "NEW",
-        "priority": data.priority or "MEDIUM",
         "deadline": deadline,
         "business_id": business_id,
         "created_by": user["uid"] if user else None,
@@ -113,7 +108,6 @@ def update_task(task_id: str, business_id: str, data: dict):
         "title",
         "description",
         "status",
-        "priority",
         "assigned_to"
     ]
 
