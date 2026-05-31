@@ -123,3 +123,21 @@ def update_task(task_id: str, business_id: str, data: dict):
         "id": task_id,
         **update_data
     }
+
+def delete_task(task_id: str, business_id: str):
+
+    ref = db.collection("tasks").document(task_id)
+
+    doc = ref.get()
+
+    if not doc.exists:
+        return False
+
+    task = doc.to_dict()
+
+    if task.get("business_id") != business_id:
+        return False
+
+    ref.delete()
+
+    return True

@@ -6,7 +6,8 @@ from app.modules.manager.tasks.service_tasks import (
     get_tasks,
     create_task,
     get_task_by_id,
-    update_task
+    update_task,
+    delete_task
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -69,3 +70,25 @@ def update_task_endpoint(task_id: str, data: UpdateTaskRequest, user=Depends(get
         raise HTTPException(404, "Task not found")
 
     return result
+
+@router.delete("/{task_id}")
+def remove_task(
+    task_id: str,
+    user=Depends(get_current_user)
+):
+
+    deleted = delete_task(
+        task_id,
+        user["business_id"]
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+
+    return {
+        "success": True,
+        "message": "Task deleted"
+    }
