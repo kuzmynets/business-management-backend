@@ -2,16 +2,24 @@ from app.firebase import db
 from app.modules.owner.Finance.finance_service import create_order_income_transactions
 
 
-def _user_label(user_id: str | None):
+def _user_label(user_id: str | None, cache: dict | None = None):
     if not user_id:
         return None
 
+    if cache is not None and user_id in cache:
+        return cache[user_id]
+
     doc = db.collection("users").document(user_id).get()
     if not doc.exists:
+        if cache is not None:
+            cache[user_id] = user_id
         return user_id
 
     user = doc.to_dict()
-    return user.get("full_name") or user.get("name") or user.get("email") or user_id
+    label = user.get("full_name") or user.get("name") or user.get("email") or user_id
+    if cache is not None:
+        cache[user_id] = label
+    return label
 
 
 def get_orders_for_business(business_id: str):
@@ -69,6 +77,7 @@ def get_owner_work_overview(business_id: str):
     )
 
     order_rows = []
+    user_cache = {}
     for order in orders:
         created_by = order.get("created_by")
         completed_by = order.get("completed_by")
@@ -79,9 +88,9 @@ def get_owner_work_overview(business_id: str):
             "budget": order.get("budget"),
             "status": order.get("status", "NEW"),
             "created_by": created_by,
-            "created_by_name": _user_label(created_by),
+            "created_by_name": _user_label(created_by, user_cache),
             "completed_by": completed_by,
-            "completed_by_name": _user_label(completed_by),
+            "completed_by_name": _user_label(completed_by, user_cache),
             "created_at": order.get("created_at"),
             "updated_at": order.get("updated_at")
         })
@@ -100,11 +109,11 @@ def get_owner_work_overview(business_id: str):
             "status": task.get("status", "NEW"),
             "priority": task.get("priority", "MEDIUM"),
             "created_by": created_by,
-            "created_by_name": _user_label(created_by),
+            "created_by_name": _user_label(created_by, user_cache),
             "assigned_by": assigned_by,
-            "assigned_by_name": _user_label(assigned_by),
+            "assigned_by_name": _user_label(assigned_by, user_cache),
             "assigned_to": assigned_to,
-            "assigned_to_name": _user_label(assigned_to),
+            "assigned_to_name": _user_label(assigned_to, user_cache),
             "deadline": task.get("deadline"),
             "updated_at": task.get("updated_at") or task.get("created_at")
         })

@@ -90,17 +90,21 @@ def create_finance_transaction(business_id: str, data: dict):
     }
 
 
-def create_order_income_transaction(business_id: str, order_id: str, order: dict):
-    exists = (
-        db.collection("finance")
-        .where("order_id", "==", order_id)
-        .where("type", "==", "INCOME")
-        .limit(1)
-        .stream()
-    )
-
-    if list(exists):
+def create_order_income_transaction(business_id: str, order_id: str, order: dict, existing_income_order_ids=None):
+    if existing_income_order_ids is not None and order_id in existing_income_order_ids:
         return None
+
+    if existing_income_order_ids is None:
+        exists = (
+            db.collection("finance")
+            .where("order_id", "==", order_id)
+            .where("type", "==", "INCOME")
+            .limit(1)
+            .stream()
+        )
+
+        if list(exists):
+            return None
 
     price = float(order.get("price") or order.get("budget") or 0)
     if price <= 0:
@@ -122,18 +126,29 @@ def create_order_income_transactions(business_id: str):
     orders = (
         db.collection("orders")
         .where("business_id", "==", business_id)
+        .where("status", "==", "COMPLETED")
         .stream()
     )
+
+    income_docs = (
+        db.collection("finance")
+        .where("business_id", "==", business_id)
+        .where("type", "==", "INCOME")
+        .stream()
+    )
+    existing_income_order_ids = set()
+    for doc in income_docs:
+        order_id = doc.to_dict().get("order_id")
+        if order_id:
+            existing_income_order_ids.add(order_id)
 
     created = 0
 
     for o in orders:
         order = o.to_dict()
 
-        if order.get("status") != "COMPLETED":
-            continue
-
-        if create_order_income_transaction(business_id, o.id, order):
+        if create_order_income_transaction(business_id, o.id, order, existing_income_order_ids):
+            existing_income_order_ids.add(o.id)
             created += 1
 
     return {"created": created}

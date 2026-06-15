@@ -11,6 +11,7 @@ def get_employees(business_id: str):
     )
 
     result = []
+    user_cache = {}
 
     for d in docs:
         member = d.to_dict()
@@ -18,8 +19,10 @@ def get_employees(business_id: str):
             continue
 
         user_id = member.get("user_id")
-        user_doc = db.collection("users").document(user_id).get() if user_id else None
-        user = user_doc.to_dict() if user_doc and user_doc.exists else {}
+        if user_id and user_id not in user_cache:
+            user_doc = db.collection("users").document(user_id).get()
+            user_cache[user_id] = user_doc.to_dict() if user_doc.exists else {}
+        user = user_cache.get(user_id, {})
 
         result.append({
             "id": user_id,
